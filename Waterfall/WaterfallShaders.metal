@@ -14,8 +14,9 @@ using namespace metal;
 // MARK: - Shader structures
 // --------------------------------------------------------------------------------
 
-struct SpectrumValue {                  
-    ushort  i;                          // intensity
+struct Vertex {
+    float2  coord;                      // waterfall coordinates
+    float2  texCoord;                   // texture coordinates
 };
 
 struct Uniforms {                       
@@ -26,6 +27,7 @@ struct Uniforms {
 
 struct VertexOutput {                   // common vertex output
     float4  coord [[ position ]];       // vertex coordinates
+    float2  texCoord;                   // texture coordinates
     float4  spectrumColor;              // color
 };
 
@@ -43,25 +45,28 @@ struct VertexOutput {                   // common vertex output
 //  Returns:
 //      a VertexOutput struct
 //
-vertex VertexOutput waterfall_vertex(const device SpectrumValue* intensities [[ buffer(0) ]],
+vertex VertexOutput waterfall_vertex(const device Vertex* vertices [[ buffer(0) ]],
                                     unsigned int vertexId [[ vertex_id ]],
                                     constant Uniforms &uniforms [[ buffer(1) ]])
 {
     VertexOutput v_out;
-    float xCoord;
-    float intensity;
+//    float xCoord;
+//    float intensity;
     
-    // get the intensity
-    intensity = float(intensities[vertexId].i) / 65535.0 ;
+//    // get the intensity
+//    intensity = float(intensities[vertexId].i) / 65535.0 ;
+//
+//    // calculate the x coordinate (in clip space)
+//    xCoord = uniforms.halfBinWidth + (2.0 * float(vertexId) / uniforms.numberOfDisplayBins) - (1.0 * (uniforms.numberOfBins / uniforms.numberOfDisplayBins));
+//
+//    // send the clip space coords to the fragment shader
+//    v_out.coord = float4( xCoord, 0.0, 0.0, 1.0);
+//
+//    // pass the color to the fragment shader
+//    v_out.spectrumColor = float4(intensity, 0.0, 0.0, 1.0);
     
-    // calculate the x coordinate (in clip space)
-    xCoord = uniforms.halfBinWidth + (2.0 * float(vertexId) / uniforms.numberOfDisplayBins) - (1.0 * (uniforms.numberOfBins / uniforms.numberOfDisplayBins));
-
-    // send the clip space coords to the fragment shader
-    v_out.coord = float4( xCoord, 0.0, 0.0, 1.0);
-    
-    // pass the color to the fragment shader
-    v_out.spectrumColor = float4(1.0, 0.0, 0.0, 1.0);
+    v_out.coord = float4(vertices[vertexId].coord.xy, 0.0, 1.0);
+    v_out.texCoord = float2(vertices[vertexId].texCoord.xy);
     
     return v_out;
 }
@@ -73,9 +78,11 @@ vertex VertexOutput waterfall_vertex(const device SpectrumValue* intensities [[ 
 //  Returns:
 //      the fragment color
 //
-fragment float4 waterfall_fragment( VertexOutput in [[ stage_in ]])
+fragment float4 waterfall_fragment( VertexOutput in [[ stage_in ]],
+                                   texture2d<float, access::sample> tex2d [[texture(0)]],
+                                   sampler sampler2d [[sampler(0)]])
 {
-    // the calculated color
-    return in.spectrumColor;
+    // the texture color
+    return float4( tex2d.sample(sampler2d, in.texCoord).rgba);
 }
 

@@ -35,6 +35,8 @@ class WaterfallViewController: NSViewController {
         _waterfallView = self.view as! WaterfallView
         _waterfallView.delegate = self
 
+        _waterfallLayer.loadTexture()
+        
         // setup Waterfall Layer
         setupWaterfallLayer()
         
@@ -63,4 +65,3 @@ class WaterfallViewController: NSViewController {
         _waterfallLayer.updateUniformsBuffer()        
     }
 }
-
