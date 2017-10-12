@@ -38,11 +38,17 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
     // ----------------------------------------------------------------------------
     // MARK: - Private properties    
 
+    //  Vertices    v1  (-1, 1)     |     ( 1, 1)  v3       Texture     v1  ( 0, 1) |           ( 1, 1)  v3
+    //  (-1 to +1)                  |                       (0 to 1)                |
+    //                          ----|----                                           |
+    //                              |                                               |
+    //              v0  (-1,-1)     |     ( 1,-1)  v2                   v0  ( 0, 0) |---------  ( 1, 0)  v2
+    //
     fileprivate var _waterfallVertices              : [Vertex] = [
-        Vertex(coord: float2(-0.8, -0.8), texCoord: float2( 0.0, 0.0)),
-        Vertex(coord: float2(-0.8,  0.8), texCoord: float2( 0.0, 1.0)),
-        Vertex(coord: float2( 0.8, -0.8), texCoord: float2( 0.0, 1.0)),
-        Vertex(coord: float2( 0.8,  0.8), texCoord: float2( 1.0, 1.0))
+        Vertex(coord: float2(-1.0, -1.0), texCoord: float2( 0.0, 0.0)),         // v0
+        Vertex(coord: float2(-1.0,  1.0), texCoord: float2( 0.0, 1.0)),         // v1
+        Vertex(coord: float2( 1.0, -1.0), texCoord: float2( 1.0, 0.0)),         // v2
+        Vertex(coord: float2( 1.0,  1.0), texCoord: float2( 1.0, 1.0))          // v3
     ]
     fileprivate var _waterfallVerticesBuffer        :MTLBuffer!
     fileprivate var _waterfallPipelineState         :MTLRenderPipelineState!
@@ -58,9 +64,25 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
     fileprivate var _binWidthHz                     : CGFloat = 0.0
     fileprivate var _firstPass                      = true
     
-    fileprivate let kTextureWidth                   = 4096                        // must be >= max number of Bins
-    fileprivate let kTextureHeight                  = 2048                        // must be >= max number of lines
-    fileprivate let kBlackRGBA                      : UInt32 = 0xFF000000         // Black color in RGBA format
+    fileprivate var _texDuration                    = 0                         // seconds
+    fileprivate var _waterfallDuration              = 0                         // seconds
+    fileprivate var _lineDuration                   = 100                       // milliseconds
+    fileprivate var _texPosition                    = 2048 - 1                   // current "top" line
+
+    fileprivate var _yOffset                        : Float = 0.0               // tex vertical offset
+    fileprivate var _stepValue                      : Float = 0.0               // tex
+    fileprivate var _heightPercent                  : Float = 0.0               // tex
+    fileprivate var _startBinNumber                 = 1808
+    fileprivate var _endBinNumber                   = 2288
+
+    fileprivate let kTextureWidth                   = 4096                      // must be >= max number of Bins
+    fileprivate let kTextureHeight                  = 2048                      // must be >= max number of lines
+    fileprivate let kBlackRGBA                      : UInt32 = 0xFF000000       // Black color in RGBA format
+    fileprivate let kRedRGBA                        : UInt32 = 0xFF0000FF       // Red color in RGBA format
+    fileprivate let kGreenRGBA                      : UInt32 = 0xFF00FF00       // Green color in RGBA format
+    fileprivate let kBlueRGBA                       : UInt32 = 0xFFFF0000       // Blue color in RGBA format
+
+    var lines = [[UInt32](repeating: 0xFF0000FF, count: 4096), [UInt32](repeating: 0xFF00FF00, count: 4096), [UInt32](repeating: 0xFFFF0000, count: 4096)]
 
     // constants
     fileprivate let _log                            = (NSApp.delegate as! AppDelegate)
@@ -93,11 +115,66 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
     // ----------------------------------------------------------------------------
     // MARK: - Internal methods
     
+    func updateTexCoords(_ linesIndex: Int) {
+
+        // calculate texture duration (seconds)
+        _texDuration = (_lineDuration * kTextureHeight) / 1_000
+        
+        // copy a colored line into the texture @ the texPosition
+        let uint8Ptr = UnsafeRawPointer(lines[linesIndex]).bindMemory(to: UInt8.self, capacity: kTextureWidth * 4)
+        let region = MTLRegionMake2D(0, _texPosition, kTextureWidth, 1)
+        _texture.replace(region: region, mipmapLevel: 0, withBytes: uint8Ptr, bytesPerRow: kTextureWidth * 4)
+        
+        Swift.print("_pos = \(_texPosition)")
+        
+        // calculate waterfall duration (seconds)
+        _waterfallDuration = Int( (CGFloat(_lineDuration) * frame.height ) / 1_000 )
+        
+        // calculate texture coordinate adjustments
+        _yOffset = Float(_texPosition) / Float(kTextureHeight - 1)          // % texture height from texPosition 0
+        _stepValue = 1.0 / Float(kTextureHeight - 1)                        // dist between lines
+        _heightPercent = Float(_waterfallDuration) / Float(_texDuration)    // % waterfall duration of texture duration
+        
+        // texture y coordinates (clip space)
+//        _waterfallVertices[3].texCoord.y = (1 + _yOffset - _stepValue)
+//        _waterfallVertices[2].texCoord.y = (1 + _yOffset - _heightPercent)
+//        _waterfallVertices[1].texCoord.y = (1 + _yOffset - _stepValue)
+//        _waterfallVertices[0].texCoord.y = (1 + _yOffset - _heightPercent)
+        _waterfallVertices[3].texCoord.y = _waterfallVertices[3].texCoord.y +  Float( 1.0 / (Float(kTextureHeight) - 1.0))
+        _waterfallVertices[2].texCoord.y = _waterfallVertices[2].texCoord.y +  Float( 1.0 / (Float(kTextureHeight) - 1.0))
+        _waterfallVertices[1].texCoord.y = _waterfallVertices[1].texCoord.y +  Float( 1.0 / (Float(kTextureHeight) - 1.0))
+        _waterfallVertices[0].texCoord.y = _waterfallVertices[0].texCoord.y +  Float( 1.0 / (Float(kTextureHeight) - 1.0))
+
+        // texture x coordinates (clip space)
+        _waterfallVertices[3].texCoord.x = Float(_endBinNumber) / Float(kTextureWidth - 1)
+        _waterfallVertices[2].texCoord.x = Float(_endBinNumber) / Float(kTextureWidth - 1)
+        _waterfallVertices[1].texCoord.x = Float(_startBinNumber) / Float(kTextureWidth)
+        _waterfallVertices[0].texCoord.x = Float(_startBinNumber) / Float(kTextureWidth)
+
+//        Swift.print("\(_waterfallVertices)")
+        
+        // update the Waterfall vertices buffer
+        let size = MemoryLayout.stride(ofValue: _waterfallVertices[0])
+        let bufferPtr = _waterfallVerticesBuffer!.contents()
+        memcpy(bufferPtr, &_waterfallVertices, size * _waterfallVertices.count)
+
+//        Swift.print("x0=\(_waterfallVertices[0].texCoord.x),y0=\(_waterfallVertices[0].texCoord.y) x1=\(_waterfallVertices[1].texCoord.x),y1=\(_waterfallVertices[1].texCoord.y) x2=\(_waterfallVertices[2].texCoord.x),y2=\(_waterfallVertices[2].texCoord.y) x3=\(_waterfallVertices[3].texCoord.x),y3=\(_waterfallVertices[3].texCoord.y)")
+        
+        
+        _texPosition = (_texPosition + 1) % kTextureHeight
+//        // decrement the position in the texture (wraps)
+//        if _texPosition == 0 {
+//            _texPosition = kTextureHeight - 1
+//        } else {
+//            _texPosition -= 1
+//        }
+    }
+    
     func loadTexture() {
         
         // load the texture from the assets.xcassets (all black)
         let loader = MTKTextureLoader(device: device!)
-        _texture = try! loader.newTexture(name: "RedTexture", scaleFactor: 1.0, bundle: nil, options: nil)
+        _texture = try! loader.newTexture(name: "BlackTexture", scaleFactor: 1.0, bundle: nil, options: nil)
     }
     
     /// Populate Uniform values
@@ -150,7 +227,7 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         _commandQueue = device!.makeCommandQueue()
         
         // create a texture sampler
-        _samplerState = samplerState(forDevice: device!, sAddressMode: .clampToEdge, tAddressMode: .repeat, minFilter: .linear, maxFilter: .linear)
+        _samplerState = samplerState(sAddressMode: .repeat, tAddressMode: .repeat, minFilter: .linear, maxFilter: .linear)
 
     }
     /// Set the Metal clear color
@@ -164,12 +241,14 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
                                     alpha: Double(color.alphaComponent))
     }
     func redraw() {
-        
+
         DispatchQueue.main.async {
-            
-            self.render()
+
+//            self.render()
+            self.waterfallStreamHandler()
         }
     }
+
     // ----------------------------------------------------------------------------
     // MARK: - Private methods
     
@@ -214,48 +293,16 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         // finish using this encoder
         encoder!.endEncoding()
     }
-    
-    // ----------------------------------------------------------------------------
-    // MARK: - Class methods
-    
-    /// Create a Texture from an image in the Assets.xcassets
-    ///
-    /// - Parameters:
-    ///   - name:       name of the asset
-    ///   - device:     a Metal Device
-    /// - Returns:      a MTLTexture
-    /// - Throws:       Texture loader error
-    ///
-//    class func texture(forDevice device: MTLDevice, asset name: NSDataAsset.Name) throws -> MTLTexture {
-//
-//        // get a Texture loader
-//        let textureLoader = MTKTextureLoader(device: device)
-//
-//        // identify the asset containing the image
-//        let asset = NSDataAsset.init(name: name)
-//
-//        if let data = asset?.data {
-//
-//            // if found, create the texture
-//            return try textureLoader.newTexture(data: data, options: nil)
-//        } else {
-//
-//            // image not found
-//            fatalError("Could not load image \(name) from an asset catalog in the main bundle")
-//        }
-//    }
     /// Create a Sampler State
     ///
     /// - Parameters:
-    ///   - device:             a MTLDevice
-    ///   - sAddressMode:       the desired Sampler address mode
-    ///   - tAddressMode:       the desired Sampler address mode
-    ///   - minFilter:          the desired Sampler filtering
-    ///   - maxFilter:          the desired Sampler filtering
+    ///   - sAddressMode:       s-axis address mode
+    ///   - tAddressMode:       t-axis address mode
+    ///   - minFilter:          min filtering
+    ///   - maxFilter:          max filtering
     /// - Returns:              a MTLSamplerState
     ///
-    func samplerState(forDevice device: MTLDevice,
-                      sAddressMode: MTLSamplerAddressMode,
+    func samplerState(sAddressMode: MTLSamplerAddressMode,
                       tAddressMode: MTLSamplerAddressMode,
                       minFilter: MTLSamplerMinMagFilter,
                       maxFilter: MTLSamplerMinMagFilter) -> MTLSamplerState {
@@ -270,6 +317,33 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         samplerDescriptor.magFilter = maxFilter
         
         // return the Sampler State
-        return device.makeSamplerState(descriptor: samplerDescriptor)!
+        return device!.makeSamplerState(descriptor: samplerDescriptor)!
     }
+
+
+    func waterfallStreamHandler() {
+        
+        var linesIndex = 0
+        
+        for i in 0..<200 {
+            
+//            _lineDuration = 100
+//            _startBinNumber = 0
+//            _endBinNumber = 479
+            
+            updateTexCoords(linesIndex)
+
+            // every 50 lines, change color
+            if i > 0 && i % 50 == 0 {
+                linesIndex = (linesIndex + 1) % 3
+            }
+            
+            
+            render()
+            
+            usleep(100_000)
+        }
+    }
+
+
 }

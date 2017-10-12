@@ -37,13 +37,12 @@ struct VertexOutput {                   // common vertex output
 
 // Spectrum vertex shader
 //
-//  Parameters:
-//      vertices:       an array of vertices at position 0 (in problem space, ushort i.e. 16-bit unsigned)
-//      vertexId:       a system generated vertex index
-//      uniforms:       the unifirm struct at position 1
+//  - Parameters:
+//    - vertices:       an array of vertices at position 0 (in problem space, ushort i.e. 16-bit unsigned)
+//    - vertexId:       a system generated vertex index
+//    - uniforms:       the unifirm struct at position 1
 //
-//  Returns:
-//      a VertexOutput struct
+//  - Returns:          a VertexOutput struct
 //
 vertex VertexOutput waterfall_vertex(const device Vertex* vertices [[ buffer(0) ]],
                                     unsigned int vertexId [[ vertex_id ]],
@@ -66,17 +65,16 @@ vertex VertexOutput waterfall_vertex(const device Vertex* vertices [[ buffer(0) 
 //    v_out.spectrumColor = float4(intensity, 0.0, 0.0, 1.0);
     
     v_out.coord = float4(vertices[vertexId].coord.xy, 0.0, 1.0);
-    v_out.texCoord = float2(vertices[vertexId].texCoord.xy);
-    
+    v_out.texCoord = float2(vertices[vertexId].texCoord.x, vertices[vertexId].texCoord.y);
+
     return v_out;
 }
 
 // Spectrum fragment shader
-//  Parameters:
-//      in:         VertexOutput struct
-//
-//  Returns:
-//      the fragment color
+///
+//  - Parameters:
+//    - in:             VertexOutput struct
+//  - Returns:          the fragment color
 //
 fragment float4 waterfall_fragment( VertexOutput in [[ stage_in ]],
                                    texture2d<float, access::sample> tex2d [[texture(0)]],
