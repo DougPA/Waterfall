@@ -51,17 +51,12 @@ class WaterfallViewController: NSViewController {
     ///
     private func setupWaterfallLayer() {
         
-        // setup buffers
-        _waterfallLayer.setupBuffers()
+        _waterfallLayer.framebufferOnly = false
+        
+        // setup state
+        _waterfallLayer.setupState()
         
         // setup the spectrum background color
         _waterfallLayer.setClearColor(NSColor(srgbRed: 0.0, green: 0.0, blue: 0.0, alpha: 1.0))
-
-        let halfBinWidthPixels = Float( (1.0 / (8.0/480.0)) / 2.0 )
-        let halfBin = halfBinWidthPixels / 480.0
-        let halfBinWidthCS = 2.0 * halfBin
-
-        _waterfallLayer.populateUniforms(numberOfBins: 8, numberOfDisplayBins: 8, halfBinWidthCS: halfBinWidthCS)
-        _waterfallLayer.updateUniformsBuffer()        
     }
 }

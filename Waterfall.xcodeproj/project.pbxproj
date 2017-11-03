@@ -14,6 +14,9 @@
 		913F28BB1F8D1E6500E8FEEA /* WaterfallShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 913F28B81F8D1E6500E8FEEA /* WaterfallShaders.metal */; };
 		913F28BC1F8D1E6500E8FEEA /* WaterfallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 913F28B91F8D1E6500E8FEEA /* WaterfallView.swift */; };
 		913F28BD1F8D1E6500E8FEEA /* WaterfallLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 913F28BA1F8D1E6500E8FEEA /* WaterfallLayer.swift */; };
+		915856531FABFD6D00F8E78E /* RedTexture.png in Resources */ = {isa = PBXBuildFile; fileRef = 915856521FABFD6C00F8E78E /* RedTexture.png */; };
+		915856551FAC03A200F8E78E /* RedTexture_480x270.png in Resources */ = {isa = PBXBuildFile; fileRef = 915856541FAC03A200F8E78E /* RedTexture_480x270.png */; };
+		91B3D3091F915D60003132CB /* BlackTexture.png in Resources */ = {isa = PBXBuildFile; fileRef = 91B3D3081F915D60003132CB /* BlackTexture.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +30,9 @@
 		913F28B81F8D1E6500E8FEEA /* WaterfallShaders.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; path = WaterfallShaders.metal; sourceTree = "<group>"; };
 		913F28B91F8D1E6500E8FEEA /* WaterfallView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WaterfallView.swift; sourceTree = "<group>"; };
 		913F28BA1F8D1E6500E8FEEA /* WaterfallLayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WaterfallLayer.swift; sourceTree = "<group>"; };
+		915856521FABFD6C00F8E78E /* RedTexture.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = RedTexture.png; sourceTree = "<group>"; };
+		915856541FAC03A200F8E78E /* RedTexture_480x270.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = RedTexture_480x270.png; sourceTree = "<group>"; };
+		91B3D3081F915D60003132CB /* BlackTexture.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BlackTexture.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +65,9 @@
 		913F28A51F8D1DBB00E8FEEA /* Waterfall */ = {
 			isa = PBXGroup;
 			children = (
+				915856541FAC03A200F8E78E /* RedTexture_480x270.png */,
+				915856521FABFD6C00F8E78E /* RedTexture.png */,
+				91B3D3081F915D60003132CB /* BlackTexture.png */,
 				913F28BA1F8D1E6500E8FEEA /* WaterfallLayer.swift */,
 				913F28B81F8D1E6500E8FEEA /* WaterfallShaders.metal */,
 				913F28B91F8D1E6500E8FEEA /* WaterfallView.swift */,
@@ -132,7 +141,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				913F28AB1F8D1DBB00E8FEEA /* Assets.xcassets in Resources */,
+				915856531FABFD6D00F8E78E /* RedTexture.png in Resources */,
+				91B3D3091F915D60003132CB /* BlackTexture.png in Resources */,
 				913F28AE1F8D1DBB00E8FEEA /* Main.storyboard in Resources */,
+				915856551FAC03A200F8E78E /* RedTexture_480x270.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -280,9 +292,10 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Waterfall/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				PRODUCT_BUNDLE_IDENTIFIER = net.k3tzr.Waterfall;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 4.0;
+				SWIFT_VERSION = 3.0;
 			};
 			name = Debug;
 		};
@@ -295,9 +308,10 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Waterfall/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				PRODUCT_BUNDLE_IDENTIFIER = net.k3tzr.Waterfall;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 4.0;
+				SWIFT_VERSION = 3.0;
 			};
 			name = Release;
 		};
