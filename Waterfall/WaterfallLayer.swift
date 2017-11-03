@@ -44,17 +44,17 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         Vertex(coord: float2( 1.0, -1.0), texCoord: float2( 1.0, 1.0)),         // v2 - bottom right
         Vertex(coord: float2( 1.0,  1.0), texCoord: float2( 1.0, 0.0))          // v3 - top    right
     ]
-    fileprivate var _waterfallVerticesBuffer        : MTLBuffer!
-    
-    fileprivate var _waterfallPipelineState         :MTLRenderPipelineState!
-    fileprivate var _linePipelineState              :MTLRenderPipelineState!
+    fileprivate var _waterfallPipelineState         : MTLRenderPipelineState!
+    fileprivate var _linePipelineState              : MTLRenderPipelineState!
 
-    fileprivate var _texture                        :MTLTexture!
-    fileprivate var _samplerState                   :MTLSamplerState!
-    fileprivate var _commandQueue                   :MTLCommandQueue!
-    fileprivate var _clearColor                     :MTLClearColor?
+    fileprivate var _texture0                       : MTLTexture!
+    fileprivate var _texture1                       : MTLTexture!
+    fileprivate var _samplerState                   : MTLSamplerState!
+    fileprivate var _commandQueue                   : MTLCommandQueue!
+    fileprivate var _clearColor                     : MTLClearColor?
 
     fileprivate var _firstPass                      = true
+    fileprivate var _passIndex                      = 0
     
     var line = [UInt32](repeating: WaterfallLayer.kGreenRGBA, count: WaterfallLayer.kTextureWidth)
 
@@ -85,31 +85,35 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         // create a render pass descriptor
         let renderPassDesc = MTLRenderPassDescriptor()
         renderPassDesc.colorAttachments[0].texture = drawable.texture
-//        if _firstPass {
-//            _firstPass = false
-            renderPassDesc.colorAttachments[0].loadAction = .clear
-//        } else {
-//            renderPassDesc.colorAttachments[0].loadAction = .dontCare
-//        }
-        
+        renderPassDesc.colorAttachments[0].loadAction = .clear
+
         
         // draw the triangles w/texture
         
 
         // Create a render encoder
         let encoder = cmdBuffer.makeRenderCommandEncoder(descriptor: renderPassDesc)
-        encoder.label = "WF encoder"
+        encoder.label = "WF Render encoder"
         
-        encoder.pushDebugGroup("WF triangles")
 
         // set the pipeline state
         encoder.setRenderPipelineState(_waterfallPipelineState)
 
-        // bind the buffer containing the Waterfall vertices (position 0)
-        encoder.setVertexBuffer(_waterfallVerticesBuffer, offset: 0, at: 0)
+        // bind the bytes containing the vertices
+        let size = MemoryLayout.stride(ofValue: _waterfallVertices[0])
+        encoder.setVertexBytes(&_waterfallVertices, length: size * _waterfallVertices.count, at: 0)
 
         // bind the texture
-        encoder.setFragmentTexture(_texture, at: 0)
+        if _passIndex == 0 {
+            encoder.pushDebugGroup("WF Draw w/tex_0")
+
+            encoder.setFragmentTexture(_texture0, at: 0)
+
+        } else {
+            encoder.pushDebugGroup("WF Draw w/tex_1")
+
+            encoder.setFragmentTexture(_texture1, at: 0)
+        }
         
         // bind the sampler state
         encoder.setFragmentSamplerState(_samplerState, at: 0)
@@ -121,23 +125,30 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         
         // finish using this encoder
         encoder.endEncoding()
-        
 
         
         // blit the framebuffer to the texture
 
         
-        
         let blitEncoder = cmdBuffer.makeBlitCommandEncoder()
-        blitEncoder.label = "Blit encoder"
+        blitEncoder.label = "WF Blit encoder"
 
-        blitEncoder.pushDebugGroup("WF blit")
+        if _passIndex == 0 {
+            blitEncoder.pushDebugGroup("WF Copy tex 0 -> 1")
 
+            blitEncoder.copy(from: _texture0, sourceSlice: 0, sourceLevel: 0,
+                             sourceOrigin: MTLOriginMake(0, 0, 0), sourceSize: MTLSizeMake(WaterfallLayer.kTextureWidth, WaterfallLayer.kTextureHeight-1, 1),
+                             to: _texture1, destinationSlice: 0, destinationLevel: 0, destinationOrigin: MTLOriginMake(0, 1, 0))
+            blitEncoder.synchronize(resource: _texture1)
 
-        blitEncoder.copy(from: renderPassDesc.colorAttachments[0].texture!, sourceSlice: 0, sourceLevel: 0,
-                         sourceOrigin: MTLOriginMake(0, 0, 0), sourceSize: MTLSizeMake(WaterfallLayer.kTextureWidth, WaterfallLayer.kTextureHeight-1, 1),
-                         to: _texture, destinationSlice: 0, destinationLevel: 0, destinationOrigin: MTLOriginMake(0, 1, 0))
+        } else {
+            blitEncoder.pushDebugGroup("WF Copy tex 1 -> 0")
 
+            blitEncoder.copy(from: _texture1, sourceSlice: 0, sourceLevel: 0,
+                             sourceOrigin: MTLOriginMake(0, 0, 0), sourceSize: MTLSizeMake(WaterfallLayer.kTextureWidth, WaterfallLayer.kTextureHeight-1, 1),
+                             to: _texture0, destinationSlice: 0, destinationLevel: 0, destinationOrigin: MTLOriginMake(0, 1, 0))
+            blitEncoder.synchronize(resource: _texture0)
+        }
         // finish using this encoder
         blitEncoder.endEncoding()
         
@@ -149,39 +160,30 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         
         // finalize rendering & push the command buffer to the GPU
         cmdBuffer.commit()
+        
+        _passIndex = (_passIndex + 1) % 2
     }
 
     // ----------------------------------------------------------------------------
     // MARK: - Internal methods
     
-    func updateTexCoords() {
-
-        // recalc values initially or when center/bandwidth changes
-        if updateNeeded {
-            
-            updateNeeded = false
-            
-            // copy a colored line into the texture @ the texPosition
-            let uint8Ptr = UnsafeRawPointer(line).bindMemory(to: UInt8.self, capacity: WaterfallLayer.kTextureWidth * 4)
-            let region = MTLRegionMake2D(0, 0, WaterfallLayer.kTextureWidth, 1)
-            _texture.replace(region: region, mipmapLevel: 0, withBytes: uint8Ptr, bytesPerRow: WaterfallLayer.kTextureWidth * 4)
-        }
-    }
-    
     func loadTexture() {
         
         // load the texture from a resource
         let loader = MTKTextureLoader(device: device!)
-        let texURL = Bundle.main.urlForImageResource("RedTexture_480x270.png")!
-        _texture = try! loader.newTexture(withContentsOf: texURL, options: [MTKTextureLoaderOptionSRGB: NSNumber(value: false)])
+        var texURL = Bundle.main.urlForImageResource("BlackTexture_480x270.png")!
+        _texture0 = try! loader.newTexture(withContentsOf: texURL, options: [
+            MTKTextureLoaderOptionSRGB: NSNumber(value: false)])
+
+        texURL = Bundle.main.urlForImageResource("RedTexture_480x270.png")!
+        _texture1 = try! loader.newTexture(withContentsOf: texURL, options: [
+            MTKTextureLoaderOptionSRGB: NSNumber(value: false)])
+        _texture0.label = "Texture_0"
+        _texture1.label = "Texture_1"
     }
-    /// Setup State
+    /// Setup persistent objects
     ///
-    func setupState() {
-        
-        // create a Buffer for Waterfall Vertices
-        let dataSize = _waterfallVertices.count * MemoryLayout.stride(ofValue: _waterfallVertices[0])
-        _waterfallVerticesBuffer = device!.makeBuffer(bytes: _waterfallVertices, length: dataSize)
+    func setupPersistentObjects() {
         
         // get the Library (contains all compiled .metal files in this project)
         let library = device!.newDefaultLibrary()
@@ -234,8 +236,24 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         
         for _ in 0..<100 {
         
-            updateTexCoords()
-
+            // recalc values initially or when center/bandwidth changes
+            if updateNeeded {
+                
+                updateNeeded = false
+                
+            }
+            
+            // copy a colored line into the texture @ the texPosition
+            let uint8Ptr = UnsafeRawPointer(line).bindMemory(to: UInt8.self, capacity: WaterfallLayer.kTextureWidth * 4)
+            let region = MTLRegionMake2D(0, 0, WaterfallLayer.kTextureWidth, 1)
+            if _passIndex == 0 {
+                
+                _texture0.replace(region: region, mipmapLevel: 0, withBytes: uint8Ptr, bytesPerRow: WaterfallLayer.kTextureWidth * 4)
+            } else {
+                
+                _texture1.replace(region: region, mipmapLevel: 0, withBytes: uint8Ptr, bytesPerRow: WaterfallLayer.kTextureWidth * 4)
+            }
+            
             autoreleasepool {
                 self.render()
             }

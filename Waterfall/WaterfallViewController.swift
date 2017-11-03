@@ -54,7 +54,7 @@ class WaterfallViewController: NSViewController {
         _waterfallLayer.framebufferOnly = false
         
         // setup state
-        _waterfallLayer.setupState()
+        _waterfallLayer.setupPersistentObjects()
         
         // setup the spectrum background color
         _waterfallLayer.setClearColor(NSColor(srgbRed: 0.0, green: 0.0, blue: 0.0, alpha: 1.0))

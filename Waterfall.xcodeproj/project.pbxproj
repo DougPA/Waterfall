@@ -16,6 +16,7 @@
 		913F28BD1F8D1E6500E8FEEA /* WaterfallLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 913F28BA1F8D1E6500E8FEEA /* WaterfallLayer.swift */; };
 		915856531FABFD6D00F8E78E /* RedTexture.png in Resources */ = {isa = PBXBuildFile; fileRef = 915856521FABFD6C00F8E78E /* RedTexture.png */; };
 		915856551FAC03A200F8E78E /* RedTexture_480x270.png in Resources */ = {isa = PBXBuildFile; fileRef = 915856541FAC03A200F8E78E /* RedTexture_480x270.png */; };
+		915856571FACD9D400F8E78E /* BlackTexture_480x270.png in Resources */ = {isa = PBXBuildFile; fileRef = 915856561FACD9D400F8E78E /* BlackTexture_480x270.png */; };
 		91B3D3091F915D60003132CB /* BlackTexture.png in Resources */ = {isa = PBXBuildFile; fileRef = 91B3D3081F915D60003132CB /* BlackTexture.png */; };
 /* End PBXBuildFile section */
 
@@ -32,6 +33,7 @@
 		913F28BA1F8D1E6500E8FEEA /* WaterfallLayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WaterfallLayer.swift; sourceTree = "<group>"; };
 		915856521FABFD6C00F8E78E /* RedTexture.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = RedTexture.png; sourceTree = "<group>"; };
 		915856541FAC03A200F8E78E /* RedTexture_480x270.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = RedTexture_480x270.png; sourceTree = "<group>"; };
+		915856561FACD9D400F8E78E /* BlackTexture_480x270.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BlackTexture_480x270.png; sourceTree = "<group>"; };
 		91B3D3081F915D60003132CB /* BlackTexture.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BlackTexture.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -65,6 +67,7 @@
 		913F28A51F8D1DBB00E8FEEA /* Waterfall */ = {
 			isa = PBXGroup;
 			children = (
+				915856561FACD9D400F8E78E /* BlackTexture_480x270.png */,
 				915856541FAC03A200F8E78E /* RedTexture_480x270.png */,
 				915856521FABFD6C00F8E78E /* RedTexture.png */,
 				91B3D3081F915D60003132CB /* BlackTexture.png */,
@@ -143,6 +146,7 @@
 				913F28AB1F8D1DBB00E8FEEA /* Assets.xcassets in Resources */,
 				915856531FABFD6D00F8E78E /* RedTexture.png in Resources */,
 				91B3D3091F915D60003132CB /* BlackTexture.png in Resources */,
+				915856571FACD9D400F8E78E /* BlackTexture_480x270.png in Resources */,
 				913F28AE1F8D1DBB00E8FEEA /* Main.storyboard in Resources */,
 				915856551FAC03A200F8E78E /* RedTexture_480x270.png in Resources */,
 			);
