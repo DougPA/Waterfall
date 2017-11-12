@@ -45,25 +45,33 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         Vertex(coord: float2( 1.0,  1.0), texCoord: float2( 1.0, 0.0))          // v3 - top    right
     ]
     fileprivate var _waterfallPipelineState         : MTLRenderPipelineState!
-    fileprivate var _linePipelineState              : MTLRenderPipelineState!
+    fileprivate var _computePipelineState           : MTLComputePipelineState!
 
-    fileprivate var _texture0                       : MTLTexture!
-    fileprivate var _texture1                       : MTLTexture!
+    fileprivate var _drawTexture                    : MTLTexture!
+    fileprivate var _intensityTexture0              : MTLTexture!
+    fileprivate var _intensityTexture1              : MTLTexture!
     fileprivate var _samplerState                   : MTLSamplerState!
     fileprivate var _commandQueue                   : MTLCommandQueue!
     fileprivate var _clearColor                     : MTLClearColor?
+    fileprivate var _region                         = MTLRegionMake2D(0, 0, WaterfallLayer.kNumberOfBins, 1)
 
-    fileprivate var _firstPass                      = true
+    let _threadGroupCount = MTLSizeMake(16, 16, 1)
+    
+    lazy var _threadGroups: MTLSize = {
+        MTLSizeMake(WaterfallLayer.kTextureWidth / self._threadGroupCount.width, WaterfallLayer.kTextureHeight / self._threadGroupCount.height, 1)
+    }()
+
     fileprivate var _passIndex                      = 0
     
-    var line = [UInt32](repeating: WaterfallLayer.kGreenBGRA, count: kNumberOfBins)
+    var _greenLine = [UInt16](repeating: UInt16.max/3, count: WaterfallLayer.kTextureWidth)          // line of Green intensity
 
     // constants
     fileprivate let kWaterfallVertex                = "waterfall_vertex"
     fileprivate let kWaterfallFragment              = "waterfall_fragment"
 
-    static let kTextureWidth                        = 4096                      // must be >= max number of Bins
-    static let kTextureHeight                       = 2048                      // must be >= max number of lines
+    // statics
+    static let kTextureWidth                        = 3360                      // must be >= max number of Bins
+    static let kTextureHeight                       = 1024                      // must be >= max number of lines
     
     static let kFrameWidth                          = 480                       // frame width (pixels)
     static let kFrameHeight                         = 270                       // frame height (pixels)
@@ -72,10 +80,10 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
     static let kStartingBin                         = (kNumberOfBins -  kFrameWidth)  / 2       // first bin on screen
     static let kEndingBin                           = (kNumberOfBins - 1 - kStartingBin)        // last bin on screen
 
-    static let kBlackBGRA                           : UInt32 = 0xFF000000   // Black color in BGRA format
-    static let kRedBGRA                             : UInt32 = 0xFFFF0000   // Red color in BGRA format
-    static let kGreenBGRA                           : UInt32 = 0xFF00FF00   // Green color in BGRA format
-    static let kBlueBGRA                            : UInt32 = 0xFF0000FF   // Blue color in BGRA format
+    static let kBlackBGRA                           : UInt32 = 0xFF000000       // Black color in BGRA format
+    static let kRedBGRA                             : UInt32 = 0xFFFF0000       // Red color in BGRA format
+    static let kGreenBGRA                           : UInt32 = 0xFF00FF00       // Green color in BGRA format
+    static let kBlueBGRA                            : UInt32 = 0xFF0000FF       // Blue color in BGRA format
 
     // ----------------------------------------------------------------------------
     // MARK: - Public methods
@@ -84,53 +92,79 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
     ///
     public func render() {
         
+        // ----- convert the intensities to gradient colors -----
+        
+        // create a command buffer
+        var cmdBuffer = _commandQueue.makeCommandBuffer()!
+        
+        let computeEncoder = cmdBuffer.makeComputeCommandEncoder()!
+        
+        computeEncoder.pushDebugGroup("Convert")
+        
+        computeEncoder.setComputePipelineState(_computePipelineState)
+        
+        let currentTexture = (_passIndex == 0 ? _intensityTexture0 : _intensityTexture1 )
+        computeEncoder.setTexture(currentTexture, index: 0)
+        computeEncoder.setTexture(_drawTexture, index: 1)
+        
+        computeEncoder.dispatchThreadgroups(_threadGroups, threadsPerThreadgroup: _threadGroupCount)
+        
+        computeEncoder.popDebugGroup()
+        
+        computeEncoder.endEncoding()
+        
+        cmdBuffer.commit()
+        cmdBuffer.waitUntilCompleted()
+
+        // ----- prepare to draw -----
+
         // obtain a drawable
         guard let drawable = nextDrawable() else { return }
         
-        // create a command buffer
-        let cmdBuffer = _commandQueue.makeCommandBuffer()
+        // create another command buffer
+        cmdBuffer = _commandQueue.makeCommandBuffer()!
         
         // create a render pass descriptor
         let renderPassDesc = MTLRenderPassDescriptor()
         renderPassDesc.colorAttachments[0].texture = drawable.texture
         renderPassDesc.colorAttachments[0].loadAction = .clear
         
-        // ----- draw the triangles with a texture -----
+        // ----- draw the triangles overlaid with the current texture -----
 
         // Create a Render encoder
-        let encoder = cmdBuffer.makeRenderCommandEncoder(descriptor: renderPassDesc)
+        let renderEncoder = cmdBuffer.makeRenderCommandEncoder(descriptor: renderPassDesc)!
         
         // set the pipeline state
-        encoder.setRenderPipelineState(_waterfallPipelineState)
+        renderEncoder.setRenderPipelineState(_waterfallPipelineState)
 
         // bind the bytes containing the vertices
         let size = MemoryLayout.stride(ofValue: _waterfallVertices[0])
-        encoder.setVertexBytes(&_waterfallVertices, length: size * _waterfallVertices.count, at: 0)
+        renderEncoder.setVertexBytes(&_waterfallVertices, length: size * _waterfallVertices.count, index: 0)
 
-        // bind the current texture
-        let currentTexture = (_passIndex == 0 ? _texture0 : _texture1 )
-        encoder.setFragmentTexture(currentTexture, at: 0)
+        // bind the Draw texture
+        renderEncoder.setFragmentTexture(_drawTexture, index: 0)
         
         // bind the sampler state
-        encoder.setFragmentSamplerState(_samplerState, at: 0)
+        renderEncoder.setFragmentSamplerState(_samplerState, index: 0)
         
         // Draw the triangles
-        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: _waterfallVertices.count)
+        renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: _waterfallVertices.count)
 
         // finish using the Render encoder
-        encoder.endEncoding()
+        renderEncoder.endEncoding()
         
-        // ----- blit the framebuffer to a texture -----
+        // ----- blit the current texture to the next texture (scrolls the texture down one line) -----
         
         // Create a Blit encoder
-        let blitEncoder = cmdBuffer.makeBlitCommandEncoder()
+        let blitEncoder = cmdBuffer.makeBlitCommandEncoder()!
 
         // copy & scroll the current texture to the next texture
-        let nextTexture = (_passIndex == 0 ? _texture1 : _texture0 )
+        let nextTexture = (_passIndex == 0 ? _intensityTexture1 : _intensityTexture0 )
         blitEncoder.copy(from: currentTexture!, sourceSlice: 0, sourceLevel: 0,
                          sourceOrigin: MTLOriginMake(0, 0, 0), sourceSize: MTLSizeMake(WaterfallLayer.kTextureWidth, WaterfallLayer.kTextureHeight-1, 1),
                          to: nextTexture!, destinationSlice: 0, destinationLevel: 0, destinationOrigin: MTLOriginMake(0, 1, 0))
-        // make the texture available to the CPU
+        
+        // make the next texture available to the CPU
         blitEncoder.synchronize(resource: nextTexture!)
         
         // finish using the Blit encoder
@@ -149,22 +183,45 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
     // ----------------------------------------------------------------------------
     // MARK: - Internal methods
     
-    func loadTexture() {
-        
-        // load two textures
-        let loader = MTKTextureLoader(device: device!)
-        let texURL = Bundle.main.urlForImageResource("BlackTexture.png")!
-        _texture0 = try! loader.newTexture(withContentsOf: texURL, options: [MTKTextureLoaderOptionSRGB: NSNumber(value: false)])
-        _texture1 = try! loader.newTexture(withContentsOf: texURL, options: [MTKTextureLoaderOptionSRGB: NSNumber(value: false)])
-    }
-    /// Setup persistent objects
+    /// Setup persistent objects & state
     ///
     func setupPersistentObjects() {
         
-        // get the Library (contains all compiled .metal files in this project)
-        let library = device!.newDefaultLibrary()
+        // drawable texture is used only as a framebuffer
+        framebufferOnly = true
         
-        // create a Render Pipeline Descriptor for the Spectrum
+        // setup the clear color
+        setClearColor(NSColor(srgbRed: 0.0, green: 0.0, blue: 0.0, alpha: 1.0))
+
+//        // setup a BRGA texture for drawing
+//        let loader = MTKTextureLoader(device: device!)
+//        let texURL = Bundle.main.urlForImageResource("BlackTexture.png")!
+//        _drawTexture = try! loader.newTexture(withContentsOf: texURL, options: [
+//            MTKTextureLoaderOptionTextureUsage:NSNumber(value:Int8(MTLTextureUsage.shaderWrite.rawValue)|Int8(MTLTextureUsage.shaderRead.rawValue)),
+//            MTKTextureLoaderOptionSRGB: NSNumber(value: false)
+//            ])
+        // setup a BRGA texture for drawing
+        let drawTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm,
+                                                                         width: WaterfallLayer.kTextureWidth,
+                                                                         height: WaterfallLayer.kTextureHeight,
+                                                                         mipmapped: false)
+        drawTextureDescriptor.usage = [.shaderRead, .shaderWrite]
+        _drawTexture = device!.makeTexture(descriptor: drawTextureDescriptor)
+
+        
+        // setup two UInt16 textures for intensity processing
+        let intensityTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r16Uint,
+                                                                         width: WaterfallLayer.kTextureWidth,
+                                                                         height: WaterfallLayer.kTextureHeight,
+                                                                         mipmapped: false)
+        intensityTextureDescriptor.usage = [.shaderRead, .shaderWrite]
+        _intensityTexture0 = device!.makeTexture(descriptor: intensityTextureDescriptor)
+        _intensityTexture1 = device!.makeTexture(descriptor: intensityTextureDescriptor)
+
+        // get the Library (contains all compiled .metal files in this project)
+        let library = device!.makeDefaultLibrary()
+        
+        // create a Render Pipeline Descriptor for the Waterfall
         let waterfallPipelineDesc = MTLRenderPipelineDescriptor()
         waterfallPipelineDesc.vertexFunction = library?.makeFunction(name: kWaterfallVertex)
         waterfallPipelineDesc.fragmentFunction = library?.makeFunction(name: kWaterfallFragment)
@@ -183,15 +240,18 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         samplerDescriptor.minFilter = .nearest
         samplerDescriptor.magFilter = .nearest
         
-        // create the Sampler State
+        // create and save a Sampler State
         _samplerState = device!.makeSamplerState(descriptor: samplerDescriptor)
         
-        Swift.print("# bins = \(WaterfallLayer.kNumberOfBins), start = \(WaterfallLayer.kStartingBin), end = \(WaterfallLayer.kEndingBin), end - start + 1 = \(WaterfallLayer.kEndingBin - WaterfallLayer.kStartingBin + 1)")
-        
+        // create and save the Compute Pipeline State object
+        if let kernelFunction = library!.makeFunction(name: "convert") {
+            _computePipelineState = try! device!.makeComputePipelineState(function: kernelFunction)
+        }
+
         // make the middle of the line red so you can tell if the texture is correctly positioned
-        for i in WaterfallLayer.kStartingBin + 1...WaterfallLayer.kEndingBin - 2 {
+        for i in WaterfallLayer.kStartingBin + 20...WaterfallLayer.kEndingBin - 20 {
             
-            line[i] = WaterfallLayer.kRedBGRA
+            _greenLine[i] = UInt16.max
         }
     }
     /// Set the Metal clear color
@@ -206,11 +266,7 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
     }
     func redraw() {
 
-        DispatchQueue.main.async {
-
-//            self.render()
-            self.waterfallStreamHandler()
-        }
+        waterfallStreamHandler()
     }
 
     // ----------------------------------------------------------------------------
@@ -218,46 +274,39 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
 
     func waterfallStreamHandler() {
         
-        for _ in 0..<300 {
+        // recalc values initially or when center/bandwidth changes
+        if updateNeeded {
+            
+            updateNeeded = false
+            
+            // calculate the portion of the texture in use
+            _region = MTLRegionMake2D(0, 0, WaterfallLayer.kNumberOfBins, 1)
+            
+            // set the texture left edge
+            let leftSide = Float(WaterfallLayer.kStartingBin) / Float(WaterfallLayer.kTextureWidth)
+            _waterfallVertices[0].texCoord.x = leftSide             // bottom
+            _waterfallVertices[1].texCoord.x = leftSide             // top
+            
+            // set the texture right edge
+            let rightSide = Float(WaterfallLayer.kEndingBin) / Float(WaterfallLayer.kTextureWidth)
+            _waterfallVertices[2].texCoord.x = rightSide            // bottom
+            _waterfallVertices[3].texCoord.x = rightSide            // top
+            
+            // set the texture bottom edge
+            let bottomSide = Float(frame.height) / Float(WaterfallLayer.kTextureHeight)
+            _waterfallVertices[0].texCoord.y = bottomSide           // left
+            _waterfallVertices[2].texCoord.y = bottomSide           // right
+        }
         
-            // recalc values initially or when center/bandwidth changes
-            if updateNeeded {
-                
-                updateNeeded = false
-                
-                // set the texture left edge
-                let leftSide = Float(WaterfallLayer.kStartingBin) / Float(WaterfallLayer.kTextureWidth)
-                _waterfallVertices[0].texCoord.x = leftSide             // bottom
-                _waterfallVertices[1].texCoord.x = leftSide             // top
-
-                // set the texture right edge
-                let rightSide = Float(WaterfallLayer.kEndingBin) / Float(WaterfallLayer.kTextureWidth)
-                _waterfallVertices[2].texCoord.x = rightSide            // bottom
-                _waterfallVertices[3].texCoord.x = rightSide            // top
-                
-                // set the texture bottom edge
-                let bottomSide = Float(WaterfallLayer.kFrameHeight) / Float(WaterfallLayer.kTextureHeight)
-                _waterfallVertices[0].texCoord.y = bottomSide           // left
-                _waterfallVertices[2].texCoord.y = bottomSide           // right
-            }
-            
-            // copy a dataframe line into the texture
-            let uint8Ptr = UnsafeRawPointer(line).bindMemory(to: UInt8.self, capacity: WaterfallLayer.kNumberOfBins * 4)
-            let region = MTLRegionMake2D(0, 0, WaterfallLayer.kNumberOfBins, 1)
-            if _passIndex == 0 {
-                
-                _texture0.replace(region: region, mipmapLevel: 0, withBytes: uint8Ptr, bytesPerRow: WaterfallLayer.kTextureWidth * 4)
-            } else {
-                
-                _texture1.replace(region: region, mipmapLevel: 0, withBytes: uint8Ptr, bytesPerRow: WaterfallLayer.kTextureWidth * 4)
-            }
-            
-            autoreleasepool {
-                self.render()
-            }
-            usleep(100_000)
+        // get a pointer to the dataFrame bins
+        let uint8Ptr = UnsafeRawPointer(_greenLine).bindMemory(to: UInt8.self, capacity: WaterfallLayer.kNumberOfBins * 2)
+        
+        // copy the dataFrame bins (intensities) into the current texture
+        let currentTexture = (_passIndex == 0 ? _intensityTexture0 : _intensityTexture1 )
+        currentTexture!.replace(region: _region, mipmapLevel: 0, withBytes: uint8Ptr, bytesPerRow: WaterfallLayer.kTextureWidth * 2)
+        
+        autoreleasepool {
+            self.render()
         }
     }
-
-
 }

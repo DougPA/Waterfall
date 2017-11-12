@@ -21,6 +21,9 @@ class WaterfallViewController: NSViewController {
     
     fileprivate var _waterfallLayer     : WaterfallLayer { return _waterfallView.waterfallLayer }
 
+    fileprivate let _udpReceiveQ            = DispatchQueue(label: "Waterfall.udpReceiveQ")
+    fileprivate var _streamTimer            : DispatchSourceTimer!      // periodic timer for stream activity
+
     // constants
     
     // ----------------------------------------------------------------------------
@@ -35,28 +38,39 @@ class WaterfallViewController: NSViewController {
         _waterfallView = self.view as! WaterfallView
         _waterfallView.delegate = self
 
-        _waterfallLayer.loadTexture()
-        
         // setup Waterfall Layer
-        setupWaterfallLayer()
-        
-        // draw waterfall
-        _waterfallLayer.redraw()
+        _waterfallLayer.setupPersistentObjects()
+
+        setupTimer()
     }
     
     // ----------------------------------------------------------------------------
+    // MARK: - Internal methods
+    
+    func frameDidChange() {
+        
+        _waterfallLayer.updateNeeded = true
+    }
+
+    // ----------------------------------------------------------------------------
     // MARK: - Private methods
     
-    /// Setup Panadapter layer buffers & parameters
-    ///
-    private func setupWaterfallLayer() {
+    
+    private func setupTimer() {
         
-        _waterfallLayer.framebufferOnly = false
+        // create the timer's dispatch source
+        _streamTimer = DispatchSource.makeTimerSource(flags: [.strict], queue: _udpReceiveQ)
         
-        // setup state
-        _waterfallLayer.setupPersistentObjects()
+        // start the timer
+        _streamTimer.scheduleRepeating(deadline: DispatchTime.now(), interval: .milliseconds(17), leeway: .milliseconds(10))      // Every second +/- 10%
         
-        // setup the spectrum background color
-        _waterfallLayer.setClearColor(NSColor(srgbRed: 0.0, green: 0.0, blue: 0.0, alpha: 1.0))
+        _streamTimer.resume()
+        
+        // set the event handler
+        _streamTimer.setEventHandler { [ unowned self] in
+            
+            self._waterfallLayer.waterfallStreamHandler()
+        }
+        
     }
 }

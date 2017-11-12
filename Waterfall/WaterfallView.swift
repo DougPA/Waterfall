@@ -24,7 +24,7 @@ final public class WaterfallView: NSView, CALayerDelegate {
     fileprivate var _minX                   : CAConstraint!
     fileprivate var _maxY                   : CAConstraint!
     fileprivate var _maxX                   : CAConstraint!
-    
+
     // constants
     fileprivate let kRightButton            = 0x02
     fileprivate let kRootLayer              = "root"                // layer names
@@ -36,7 +36,7 @@ final public class WaterfallView: NSView, CALayerDelegate {
     public override func awakeFromNib() {
         super.awakeFromNib()
         
-        createLayers()
+        createLayers()        
     }
     
     // ----------------------------------------------------------------------------
@@ -90,9 +90,28 @@ final public class WaterfallView: NSView, CALayerDelegate {
         waterfallLayer.framebufferOnly = true
         waterfallLayer.delegate = waterfallLayer
         
-        
         // layer hierarchy
         rootLayer.addSublayer(waterfallLayer)
+    }
+    
+    // ----------------------------------------------------------------------------
+    // MARK: - Notification Methods
+    
+    /// Add subsciptions to Notifications
+    ///     (as of 10.11, subscriptions are automatically removed on deinit when using the Selector-based approach)
+    ///
+    fileprivate func addNotifications() {
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(frameDidChange(_:)), name: NSView.frameDidChangeNotification, object: self)
+        
+    }
+    /// Process .frameDidChange Notification
+    ///
+    /// - Parameter note:       a Notification instance
+    ///
+    @objc fileprivate func frameDidChange(_ note: Notification) {
+        
+        delegate?.frameDidChange()
     }
 }
 

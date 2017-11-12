@@ -25,6 +25,33 @@ struct VertexOutput {                   // common vertex output
 };
 
 // --------------------------------------------------------------------------------
+// MARK: - Compute Shader for Gradient calculations
+// --------------------------------------------------------------------------------
+
+kernel void convert(texture2d<ushort, access::read> inTexture [[texture(0)]],
+                    texture2d<float, access::write> outTexture [[texture(1)]],
+                    uint2 gid [[thread_position_in_grid]])
+{
+    float4 colorAtPixel;
+    
+    ushort intensity = inTexture.read(gid).r;
+    
+    if (intensity >= 0 && intensity < 21845) {
+        colorAtPixel = float4(0.0, 0.0, 0.0, 1.0);  // black
+    }
+    if (intensity >= 21845 && intensity < 43690) {
+        colorAtPixel = float4(0.0, 1.0, 0.0, 1.0);  // green
+    }
+    if (intensity >= 43690 && intensity < 65535) {
+        colorAtPixel = float4(1.0, 1.0, 0.0, 1.0);  // yellow
+    }
+    if (intensity == 65535) {
+        colorAtPixel = float4(1.0, 0.0, 0.0, 1.0);  // red
+    }
+    
+    outTexture.write(colorAtPixel, gid);
+}
+// --------------------------------------------------------------------------------
 // MARK: - Shaders for Waterfall Spectrum draw calls
 // --------------------------------------------------------------------------------
 
