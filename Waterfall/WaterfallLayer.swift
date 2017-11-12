@@ -96,10 +96,12 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         
         // create a command buffer
         var cmdBuffer = _commandQueue.makeCommandBuffer()!
+        cmdBuffer.label = "Compute buffer"
         
         let computeEncoder = cmdBuffer.makeComputeCommandEncoder()!
+        computeEncoder.label = "Compute encoder"
         
-        computeEncoder.pushDebugGroup("Convert")
+        computeEncoder.pushDebugGroup("Compute")
         
         computeEncoder.setComputePipelineState(_computePipelineState)
         
@@ -123,6 +125,7 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         
         // create another command buffer
         cmdBuffer = _commandQueue.makeCommandBuffer()!
+        cmdBuffer.label = "Render buffer"
         
         // create a render pass descriptor
         let renderPassDesc = MTLRenderPassDescriptor()
@@ -133,6 +136,7 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
 
         // Create a Render encoder
         let renderEncoder = cmdBuffer.makeRenderCommandEncoder(descriptor: renderPassDesc)!
+        renderEncoder.label = "Render encoder"
         
         // set the pipeline state
         renderEncoder.setRenderPipelineState(_waterfallPipelineState)
@@ -157,6 +161,7 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         
         // Create a Blit encoder
         let blitEncoder = cmdBuffer.makeBlitCommandEncoder()!
+        blitEncoder.label = "Blit encoder"
 
         // copy & scroll the current texture to the next texture
         let nextTexture = (_passIndex == 0 ? _intensityTexture1 : _intensityTexture0 )
