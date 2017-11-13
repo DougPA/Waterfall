@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		913427BB1FBA08FE004D759C /* Basic.tex in Resources */ = {isa = PBXBuildFile; fileRef = 913427BA1FBA08FE004D759C /* Basic.tex */; };
+		913427BD1FBA0E28004D759C /* Grayscale.tex in Resources */ = {isa = PBXBuildFile; fileRef = 913427BC1FBA0E27004D759C /* Grayscale.tex */; };
 		913F28A71F8D1DBB00E8FEEA /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 913F28A61F8D1DBB00E8FEEA /* AppDelegate.swift */; };
 		913F28AB1F8D1DBB00E8FEEA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 913F28AA1F8D1DBB00E8FEEA /* Assets.xcassets */; };
 		913F28AE1F8D1DBB00E8FEEA /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 913F28AC1F8D1DBB00E8FEEA /* Main.storyboard */; };
@@ -19,6 +20,7 @@
 
 /* Begin PBXFileReference section */
 		913427BA1FBA08FE004D759C /* Basic.tex */ = {isa = PBXFileReference; lastKnownFileType = file; path = Basic.tex; sourceTree = "<group>"; };
+		913427BC1FBA0E27004D759C /* Grayscale.tex */ = {isa = PBXFileReference; lastKnownFileType = file; path = Grayscale.tex; sourceTree = "<group>"; };
 		913F28A31F8D1DBB00E8FEEA /* Waterfall.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Waterfall.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		913F28A61F8D1DBB00E8FEEA /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		913F28AA1F8D1DBB00E8FEEA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -61,6 +63,7 @@
 		913F28A51F8D1DBB00E8FEEA /* Waterfall */ = {
 			isa = PBXGroup;
 			children = (
+				913427BC1FBA0E27004D759C /* Grayscale.tex */,
 				913427BA1FBA08FE004D759C /* Basic.tex */,
 				913F28A61F8D1DBB00E8FEEA /* AppDelegate.swift */,
 				913F28AA1F8D1DBB00E8FEEA /* Assets.xcassets */,
@@ -137,6 +140,7 @@
 				913F28AB1F8D1DBB00E8FEEA /* Assets.xcassets in Resources */,
 				913427BB1FBA08FE004D759C /* Basic.tex in Resources */,
 				913F28AE1F8D1DBB00E8FEEA /* Main.storyboard in Resources */,
+				913427BD1FBA0E28004D759C /* Grayscale.tex in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

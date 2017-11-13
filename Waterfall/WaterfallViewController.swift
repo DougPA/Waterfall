@@ -48,7 +48,7 @@ class WaterfallViewController: NSViewController {
         // setup Waterfall Layer
         _waterfallLayer.setupPersistentObjects()
         
-        if let array = loadGradient(name: "Basic") {
+        if let array = loadGradient(name: "Grayscale") {
             _waterfallLayer.setGradient(array)
         } else {
             fatalError("Texture file not found")
