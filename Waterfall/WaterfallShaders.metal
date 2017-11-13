@@ -30,25 +30,19 @@ struct VertexOutput {                   // common vertex output
 
 kernel void convert(texture2d<ushort, access::read> inTexture [[texture(0)]],
                     texture2d<float, access::write> outTexture [[texture(1)]],
+                    texture1d<float, access::sample> gradientTexture [[texture(2)]],
+                    sampler sampler1d [[sampler(0)]],
                     uint2 gid [[thread_position_in_grid]])
 {
-    float4 colorAtPixel;
+    float4 colorAtPixel;    
     
-    ushort intensity = inTexture.read(gid).r;
+    // normalize the intensity value (0 to UInt16.max)
+    float normalizedIntensity = float(inTexture.read(gid).r) / float(65536);
+
+    // lookup the color in the gradient
+    colorAtPixel = float4(gradientTexture.sample(sampler1d, normalizedIntensity).rgba);
     
-    if (intensity >= 0 && intensity < 21845) {
-        colorAtPixel = float4(0.0, 0.0, 0.0, 1.0);  // black
-    }
-    if (intensity >= 21845 && intensity < 43690) {
-        colorAtPixel = float4(0.0, 1.0, 0.0, 1.0);  // green
-    }
-    if (intensity >= 43690 && intensity < 65535) {
-        colorAtPixel = float4(1.0, 1.0, 0.0, 1.0);  // yellow
-    }
-    if (intensity == 65535) {
-        colorAtPixel = float4(1.0, 0.0, 0.0, 1.0);  // red
-    }
-    
+    // write the color into the output texture
     outTexture.write(colorAtPixel, gid);
 }
 // --------------------------------------------------------------------------------

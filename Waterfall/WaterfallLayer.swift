@@ -48,9 +48,11 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
     fileprivate var _computePipelineState           : MTLComputePipelineState!
 
     fileprivate var _drawTexture                    : MTLTexture!
+    fileprivate var _gradientTexture                : MTLTexture!
     fileprivate var _intensityTexture0              : MTLTexture!
     fileprivate var _intensityTexture1              : MTLTexture!
     fileprivate var _samplerState                   : MTLSamplerState!
+    fileprivate var _gradientSamplerState           : MTLSamplerState!
     fileprivate var _commandQueue                   : MTLCommandQueue!
     fileprivate var _clearColor                     : MTLClearColor?
     fileprivate var _region                         = MTLRegionMake2D(0, 0, WaterfallLayer.kNumberOfBins, 1)
@@ -63,7 +65,7 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
 
     fileprivate var _passIndex                      = 0
     
-    var _greenLine = [UInt16](repeating: UInt16.max/3, count: WaterfallLayer.kTextureWidth)          // line of Green intensity
+    var _line = [UInt16](repeating: 0, count: WaterfallLayer.kTextureWidth)          // intensity
 
     // constants
     fileprivate let kWaterfallVertex                = "waterfall_vertex"
@@ -85,6 +87,13 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
     static let kGreenBGRA                           : UInt32 = 0xFF00FF00       // Green color in BGRA format
     static let kBlueBGRA                            : UInt32 = 0xFF0000FF       // Blue color in BGRA format
 
+    static let kBlackRGBA                           : UInt32 = 0xFF000000   // Black color in RGBA format
+    static let kRedRGBA                             : UInt32 = 0xFF0000FF   // Red color in RGBA format
+    static let kGreenRGBA                           : UInt32 = 0xFF00FF00   // Green color in RGBA format
+    static let kBlueRGBA                            : UInt32 = 0xFFFF0000   // Blue color in RGBA format
+
+    static let kSamplerSize                         = 256
+
     // ----------------------------------------------------------------------------
     // MARK: - Public methods
     
@@ -105,10 +114,19 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         
         computeEncoder.setComputePipelineState(_computePipelineState)
         
+        // choose and bind the input Texture
         let currentTexture = (_passIndex == 0 ? _intensityTexture0 : _intensityTexture1 )
         computeEncoder.setTexture(currentTexture, index: 0)
+        
+        // bind the output Texture
         computeEncoder.setTexture(_drawTexture, index: 1)
         
+        // bind the Gradient texture
+        computeEncoder.setTexture(_gradientTexture, index: 2)
+
+        // bind the sampler state for the Gradient
+        computeEncoder.setSamplerState(_gradientSamplerState, index: 0)
+
         computeEncoder.dispatchThreadgroups(_threadGroups, threadsPerThreadgroup: _threadGroupCount)
         
         computeEncoder.popDebugGroup()
@@ -198,14 +216,17 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         // setup the clear color
         setClearColor(NSColor(srgbRed: 0.0, green: 0.0, blue: 0.0, alpha: 1.0))
 
-//        // setup a BRGA texture for drawing
-//        let loader = MTKTextureLoader(device: device!)
-//        let texURL = Bundle.main.urlForImageResource("BlackTexture.png")!
-//        _drawTexture = try! loader.newTexture(withContentsOf: texURL, options: [
-//            MTKTextureLoaderOptionTextureUsage:NSNumber(value:Int8(MTLTextureUsage.shaderWrite.rawValue)|Int8(MTLTextureUsage.shaderRead.rawValue)),
-//            MTKTextureLoaderOptionSRGB: NSNumber(value: false)
-//            ])
-        // setup a BRGA texture for drawing
+        // setup a 1D texture as a Gradient
+        let gradientTextureDescriptor = MTLTextureDescriptor()
+        gradientTextureDescriptor.pixelFormat = .bgra8Unorm
+        gradientTextureDescriptor.width = WaterfallLayer.kSamplerSize
+        gradientTextureDescriptor.usage = [.shaderRead]
+        gradientTextureDescriptor.mipmapLevelCount = 1
+        gradientTextureDescriptor.textureType = .type1D
+        _gradientTexture = device!.makeTexture(descriptor: gradientTextureDescriptor)
+
+        
+        // setup a 2D texture for drawing
         let drawTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm,
                                                                          width: WaterfallLayer.kTextureWidth,
                                                                          height: WaterfallLayer.kTextureHeight,
@@ -214,7 +235,7 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         _drawTexture = device!.makeTexture(descriptor: drawTextureDescriptor)
 
         
-        // setup two UInt16 textures for intensity processing
+        // setup two 2D textures for intensity processing
         let intensityTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r16Uint,
                                                                          width: WaterfallLayer.kTextureWidth,
                                                                          height: WaterfallLayer.kTextureHeight,
@@ -253,10 +274,42 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
             _computePipelineState = try! device!.makeComputePipelineState(function: kernelFunction)
         }
 
+        // create a Sampler Descriptor & set its parameters
+        let gradientSamplerDescriptor = MTLSamplerDescriptor()
+        gradientSamplerDescriptor.sAddressMode = .clampToEdge
+        gradientSamplerDescriptor.tAddressMode = .clampToEdge
+        gradientSamplerDescriptor.minFilter = .nearest
+        gradientSamplerDescriptor.magFilter = .nearest
+        
+        // create and save a Gradient Sampler State
+        _gradientSamplerState = device!.makeSamplerState(descriptor: gradientSamplerDescriptor)
+
+        let incr = UInt16.max/100
+        
         // make the middle of the line red so you can tell if the texture is correctly positioned
-        for i in WaterfallLayer.kStartingBin + 20...WaterfallLayer.kEndingBin - 20 {
+        for i in WaterfallLayer.kStartingBin + 20..<WaterfallLayer.kStartingBin + 80 {
             
-            _greenLine[i] = UInt16.max
+            _line[i] = incr * 15        // blue
+        }
+        for i in WaterfallLayer.kStartingBin + 80..<WaterfallLayer.kStartingBin + 160 {
+            
+            _line[i] = incr * 25        // cyan
+        }
+        for i in WaterfallLayer.kStartingBin + 160..<WaterfallLayer.kStartingBin + 240 {
+            
+            _line[i] = incr * 35        // green
+        }
+        for i in WaterfallLayer.kStartingBin + 240..<WaterfallLayer.kStartingBin + 300 {
+            
+            _line[i] = incr * 55        // yellow
+        }
+        for i in WaterfallLayer.kStartingBin + 300..<WaterfallLayer.kStartingBin + 360 {
+            
+            _line[i] = incr * 90        // red
+        }
+        for i in WaterfallLayer.kStartingBin + 360..<WaterfallLayer.kStartingBin + 420 {
+            
+            _line[i] = UInt16.max       // white
         }
     }
     /// Set the Metal clear color
@@ -269,6 +322,16 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
                                     blue: Double(color.blueComponent),
                                     alpha: Double(color.alphaComponent))
     }
+    
+    func setGradient(_ gradient: [UInt8]) {
+//        // get a pointer to the gradient data
+//        let uint8Ptr = UnsafeRawPointer(gradient).bindMemory(to: UInt8.self, capacity: WaterfallLayer.kSamplerSize * 4)
+        
+        let region = MTLRegionMake1D(0, WaterfallLayer.kSamplerSize)
+        // copy the Gradient into the current texture
+        _gradientTexture!.replace(region: region, mipmapLevel: 0, withBytes: gradient, bytesPerRow: WaterfallLayer.kSamplerSize * 4)
+    }
+    
     func redraw() {
 
         waterfallStreamHandler()
@@ -304,7 +367,7 @@ public final class WaterfallLayer: CAMetalLayer, CALayerDelegate {
         }
         
         // get a pointer to the dataFrame bins
-        let uint8Ptr = UnsafeRawPointer(_greenLine).bindMemory(to: UInt8.self, capacity: WaterfallLayer.kNumberOfBins * 2)
+        let uint8Ptr = UnsafeRawPointer(_line).bindMemory(to: UInt8.self, capacity: WaterfallLayer.kNumberOfBins * 2)
         
         // copy the dataFrame bins (intensities) into the current texture
         let currentTexture = (_passIndex == 0 ? _intensityTexture0 : _intensityTexture1 )
