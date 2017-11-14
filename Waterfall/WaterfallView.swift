@@ -1,6 +1,6 @@
 //
 //  WaterfallView.swift
-//  xSDR6000
+//  Waterfall
 //
 //  Created by Douglas Adams on 10/7/17.
 //  Copyright © 2017 Douglas Adams. All rights reserved.
@@ -14,7 +14,7 @@ final public class WaterfallView: NSView, CALayerDelegate {
     // MARK: - Internal properties
     
     var delegate                            : WaterfallViewController!
-    var rootLayer                           : CALayer!              // layers
+    var rootLayer                           : CALayer!                      // layers
     var waterfallLayer                      : WaterfallLayer!
     
     // ----------------------------------------------------------------------------
@@ -27,7 +27,7 @@ final public class WaterfallView: NSView, CALayerDelegate {
 
     // constants
     fileprivate let kRightButton            = 0x02
-    fileprivate let kRootLayer              = "root"                // layer names
+    fileprivate let kRootLayer              = "root"                        // layer names
     fileprivate let kWaterfallLayer         = "waterfall"
     
     // ----------------------------------------------------------------------------
