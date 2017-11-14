@@ -85,6 +85,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 913F28B31F8D1DBB00E8FEEA /* Build configuration list for PBXNativeTarget "Waterfall" */;
 			buildPhases = (
+				91657BDE1FBB60C700DED57A /* ShellScript */,
 				913F289F1F8D1DBB00E8FEEA /* Sources */,
 				913F28A01F8D1DBB00E8FEEA /* Frameworks */,
 				913F28A11F8D1DBB00E8FEEA /* Resources */,
@@ -145,6 +146,22 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		91657BDE1FBB60C700DED57A /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "buildNumber=$(/usr/libexec/PlistBuddy -c \"Print CFBundleVersion\" \"${PROJECT_DIR}/${INFOPLIST_FILE}\")\nbuildNumber=$(($buildNumber + 1))\n/usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $buildNumber\" \"${PROJECT_DIR}/${INFOPLIST_FILE}\"";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		913F289F1F8D1DBB00E8FEEA /* Sources */ = {
